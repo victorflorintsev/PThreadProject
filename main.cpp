@@ -1,31 +1,35 @@
-#include <iostream>
-#include <cstdlib>
+// C program to demonstrate working of Semaphores
+#include <stdio.h>
 #include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
 
-using namespace std;
+sem_t mutex;
 
-#define NUM_THREADS 5
+void* thread(void* arg)
+{
+    //wait
+    sem_wait(&mutex);
+    printf("\nEntered..\n");
 
-void *PrintHello(void *threadid) {
-    long tid;
-    tid = (long)threadid;
-    cout << "Hello World! Thread ID, " << tid << endl;
-    pthread_exit(NULL);
+    //critical section
+    sleep(4);
+
+    //signal
+    printf("\nJust Exiting...\n");
+    sem_post(&mutex);
 }
 
-int main () {
-    pthread_t threads[NUM_THREADS];
-    int rc;
-    int i;
 
-    for( i = 0; i < NUM_THREADS; i++ ) {
-        cout << "main() : creating thread, " << i << endl;
-        rc = pthread_create(&threads[i], NULL, PrintHello, (void *)i);
-
-        if (rc) {
-            cout << "Error:unable to create thread," << rc << endl;
-            exit(-1);
-        }
-    }
-    pthread_exit(NULL);
+int main()
+{
+    sem_init(&mutex, 0, 1);
+    pthread_t t1,t2;
+    pthread_create(&t1,NULL,thread,NULL);
+    sleep(2);
+    pthread_create(&t2,NULL,thread,NULL);
+    pthread_join(t1,NULL);
+    pthread_join(t2,NULL);
+    sem_destroy(&mutex);
+    return 0;
 }
