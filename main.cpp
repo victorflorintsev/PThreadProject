@@ -19,6 +19,7 @@ public:
     int timeIn;
     bool WBound;
     int duration;
+    int prevTime;
 };
 
 struct Compareline {
@@ -46,6 +47,7 @@ void* thread(void* arg)
 
 void* car(void* arg) {
     line* in = (line*) arg;
+    sleep(in->prevTime);
     cout << "sleeping for " << in->timeIn << "seconds." << endl;
     sleep(in->timeIn);
     cout << "stopped sleeping." << endl;
@@ -73,6 +75,7 @@ int main()
 
     try {
         line *cur;
+        int curtime = 0;
         while (inFile >> x) {
             cur = new line();
             cur->timeIn = stoi(x);
@@ -86,6 +89,9 @@ int main()
             cur->duration = stoi(x);
             input.append(x);
             input.append("\n");
+
+            cur->prevTime = curtime;
+            curtime = curtime + cur->timeIn;
 
             pthread_t carid;
             pthread_create(&carid,NULL,car,(void *)cur);
