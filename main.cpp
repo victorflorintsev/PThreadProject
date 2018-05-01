@@ -43,6 +43,8 @@ struct Compareline {
 
 bool isWBound(string basic_string);
 
+void updateArrive(bool WBbound);
+
 int numExited = 0;
 
 bool allCarsPassed(int total) {
@@ -64,31 +66,39 @@ bool allCarsPassed(int total) {
 //}
 
 pthread_mutex_t carLock = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t mCanWB = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t mCanBB = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t canWB = PTHREAD_COND_INITIALIZER;
 pthread_cond_t canBB = PTHREAD_COND_INITIALIZER;
 bool boolCanWB = false;
 bool boolCanBB = false;
 sem_t maxInTunnel;
+int numHadToWait = 0;
+void hadToWait() {
+    numHadToWait++;
+}
 
 void* car(void* arg) {
     line* in = (line*) arg;
     sleep(in->prevTime);
     sleep(in->timeIn);
+    bool didGrab = false;
     cout << "Car #" << in->carNum << " going to " << in->WBoundString << " arrives at the tunnel." << endl;
+    updateArrive(in->WBound);
     pthread_mutex_lock(&carLock);
     if (in->WBound) {
         while (!boolCanWB) {
             pthread_cond_wait(&canWB, &carLock);
-            sem_wait(&maxInTunnel);        }
+        }
+
     } else {
         while (!boolCanBB) {
             pthread_cond_wait(&canBB, &carLock);
-            sem_wait(&maxInTunnel);
         }
     }
     pthread_mutex_unlock(&carLock);
+    int test;
+    sem_getvalue(&maxInTunnel,&test);
+    if (test <= 0) hadToWait();
+    sem_wait(&maxInTunnel);
 
     cout << "Car #" << in->carNum << " going to " << in->WBoundString << " enters the tunnel." << endl;
     sleep(in->duration);
@@ -96,6 +106,16 @@ void* car(void* arg) {
     cout << "Car #" << in->carNum << " going to " << in->WBoundString << " exits the tunnel." << endl;
     numExited++;
 }
+int numWBArrived = 0;
+int numBBArrived = 0;
+void updateArrive(bool WBbound) {
+    if (WBbound) {
+        numWBArrived++;
+    } else {
+        numBBArrived++;
+    }
+}
+
 
 bool goTunnel = true;
 
@@ -121,6 +141,10 @@ void* tunnel(void* arg) {
         cout << "The tunnel is now closed to ALL traffic." << endl;
         sleep(info->waitTime);
     }
+    cout << numBBArrived << " car(s) going to Bear Valley arrived at the tunnel" << endl;
+    cout << numWBArrived << " car(s) going to Whittier arrived at the tunnel" << endl;
+
+    cout << numHadToWait << " car(s) had to wait because the tunnel was full" << endl;
 }
 
 int main()
