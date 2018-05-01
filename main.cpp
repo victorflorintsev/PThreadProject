@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iostream>
 #include <queue>
+#include <condition_variable>
 
 using namespace std;
 
@@ -20,6 +21,17 @@ public:
     bool WBound;
     int duration;
     int prevTime;
+
+    int carNum;
+    string WBoundString;
+};
+
+class tunnelinfo {
+public:
+    tunnelinfo() {}
+    int maxAllowed;
+    int numCars;
+    int waitTime;
 };
 
 struct Compareline {
@@ -31,28 +43,51 @@ struct Compareline {
 
 bool isWBound(string basic_string);
 
-void* thread(void* arg)
-{
-    //wait
-    sem_wait(&mutex);
-    printf("\nEntered..\n");
-
-    //critical section
-    sleep(4);
-
-    //signal
-    printf("\nJust Exiting...\n");
-    sem_post(&mutex);
-}
+//void* thread(void* arg)
+//{
+//    //wait
+//    sem_wait(&mutex);
+//    printf("\nEntered..\n");
+//
+//    //critical section
+//    sleep(4);
+//
+//    //signal
+//    printf("\nJust Exiting...\n");
+//    sem_post(&mutex);
+//}
 
 void* car(void* arg) {
     line* in = (line*) arg;
     sleep(in->prevTime);
-    cout << "sleeping for " << in->timeIn << "seconds." << endl;
     sleep(in->timeIn);
-    cout << "stopped sleeping." << endl;
+    cout << "Car #" << in->carNum << " going to " << in->WBoundString << " arrives at the tunnel." << endl;
+
+
+    cout << "Car #" << in->carNum << " going to " << in->WBoundString << " enters the tunnel." << endl;
+    sleep(in->duration);
+    cout << "Car #" << in->carNum << " going to " << in->WBoundString << " exits the tunnel." << endl;
 }
 
+bool goTunnel = true;
+
+void* tunnel(void* arg) {
+    tunnelinfo *info = (tunnelinfo*) arg;
+    while (goTunnel) {
+        cout << "The tunnel is now open to Whittier-bound traffic." << endl;
+        sleep(info->waitTime);
+        cout << "The tunnel is now closed to ALL traffic." << endl;
+        sleep(info->waitTime);
+        cout << "The tunnel is now open to Bear Valley-bound traffic." << endl;
+        sleep(info->waitTime);
+    }
+}
+
+pthread_cond_t canWB = PTHREAD_COND_INITIALIZER;
+pthread_cond_t canBB = PTHREAD_COND_INITIALIZER;
+bool boolCanWB = false;
+bool boolCanBB = false;
+sem_t maxInTunnel;
 
 int main()
 {
@@ -71,6 +106,7 @@ int main()
     int MAX_TUNNEL = stoi(x);
     input.append(x);
     input.append("\n");
+    sem_init(&maxInTunnel, 0 ,MAX_TUNNEL);
 
 
     try {
@@ -78,11 +114,13 @@ int main()
         int curtime = 0;
         while (inFile >> x) {
             cur = new line();
+            cur-> carNum = n+1;
             cur->timeIn = stoi(x);
             input.append(x);
             input.append(" ");
             inFile >> x;
             cur->WBound = isWBound(x);
+            cur->WBoundString = x;
             input.append(x);
             input.append(" ");
             inFile >> x;
@@ -96,11 +134,18 @@ int main()
             pthread_t carid;
             pthread_create(&carid,NULL,car,(void *)cur);
 
-            n++;
+            n++; // at the end, the n contains the number of threads
         }
     } catch (exception e) {
         cout << "something went wrong reading the file";
     }
+
+    tunnelinfo *info = new tunnelinfo();
+    info->waitTime = 5;
+    info->maxAllowed = MAX_TUNNEL;
+    info->numCars = n;
+    pthread_t tid;
+    pthread_create(&tid,NULL,tunnel,(void *)info);
     pthread_exit(0);
     inFile.close();
 
