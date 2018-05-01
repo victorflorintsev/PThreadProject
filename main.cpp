@@ -1,5 +1,5 @@
 // C program to demonstrate working of Semaphores
-#include <stdio.h>
+#include <cstdio>
 #include <pthread.h>
 #include <semaphore.h>
 #include <unistd.h>
@@ -75,13 +75,14 @@ int numHadToWait = 0;
 void hadToWait() {
     numHadToWait++;
 }
-
+pthread_mutex_t coutMutex;
 void* car(void* arg) {
     line* in = (line*) arg;
     sleep(in->prevTime);
     sleep(in->timeIn);
-    bool didGrab = false;
+    pthread_mutex_lock(&coutMutex);
     cout << "Car #" << in->carNum << " going to " << in->WBoundString << " arrives at the tunnel." << endl;
+    pthread_mutex_unlock(&coutMutex);
     updateArrive(in->WBound);
     pthread_mutex_lock(&carLock);
     if (in->WBound) {
