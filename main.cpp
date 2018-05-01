@@ -43,6 +43,12 @@ struct Compareline {
 
 bool isWBound(string basic_string);
 
+int numExited = 0;
+
+bool allCarsPassed(int total) {
+    return numExited == total;
+}
+
 //void* thread(void* arg)
 //{
 //    //wait
@@ -57,16 +63,38 @@ bool isWBound(string basic_string);
 //    sem_post(&mutex);
 //}
 
+pthread_mutex_t carLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mCanWB = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mCanBB = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t canWB = PTHREAD_COND_INITIALIZER;
+pthread_cond_t canBB = PTHREAD_COND_INITIALIZER;
+bool boolCanWB = false;
+bool boolCanBB = false;
+sem_t maxInTunnel;
+
 void* car(void* arg) {
     line* in = (line*) arg;
     sleep(in->prevTime);
     sleep(in->timeIn);
     cout << "Car #" << in->carNum << " going to " << in->WBoundString << " arrives at the tunnel." << endl;
-
+    pthread_mutex_lock(&carLock);
+    if (in->WBound) {
+        while (!boolCanWB) {
+            pthread_cond_wait(&canWB, &carLock);
+            sem_wait(&maxInTunnel);        }
+    } else {
+        while (!boolCanBB) {
+            pthread_cond_wait(&canBB, &carLock);
+            sem_wait(&maxInTunnel);
+        }
+    }
+    pthread_mutex_unlock(&carLock);
 
     cout << "Car #" << in->carNum << " going to " << in->WBoundString << " enters the tunnel." << endl;
     sleep(in->duration);
+    sem_post(&maxInTunnel);
     cout << "Car #" << in->carNum << " going to " << in->WBoundString << " exits the tunnel." << endl;
+    numExited++;
 }
 
 bool goTunnel = true;
@@ -74,20 +102,26 @@ bool goTunnel = true;
 void* tunnel(void* arg) {
     tunnelinfo *info = (tunnelinfo*) arg;
     while (goTunnel) {
+        boolCanWB = true;
+        pthread_cond_broadcast(&canWB);
+        if (allCarsPassed(info->numCars)) break;
         cout << "The tunnel is now open to Whittier-bound traffic." << endl;
         sleep(info->waitTime);
+        boolCanWB = false;
+        if (allCarsPassed(info->numCars)) break;
         cout << "The tunnel is now closed to ALL traffic." << endl;
         sleep(info->waitTime);
+        boolCanBB = true;
+        pthread_cond_broadcast(&canBB);
+        if (allCarsPassed(info->numCars)) break;
         cout << "The tunnel is now open to Bear Valley-bound traffic." << endl;
+        sleep(info->waitTime);
+        boolCanBB = false;
+        if (allCarsPassed(info->numCars)) break;
+        cout << "The tunnel is now closed to ALL traffic." << endl;
         sleep(info->waitTime);
     }
 }
-
-pthread_cond_t canWB = PTHREAD_COND_INITIALIZER;
-pthread_cond_t canBB = PTHREAD_COND_INITIALIZER;
-bool boolCanWB = false;
-bool boolCanBB = false;
-sem_t maxInTunnel;
 
 int main()
 {
